@@ -12,7 +12,7 @@
     undo = SG.snapshot();
   }
 
-  function toast(message, canUndo) {
+  function toast(message, canUndo, sticky) {
     var box = document.getElementById("toast");
     var text = document.getElementById("toast-text");
     var button = document.getElementById("toast-undo");
@@ -21,7 +21,7 @@
     button.hidden = !canUndo;
     box.hidden = false;
     clearTimeout(timer);
-    timer = setTimeout(function () { box.hidden = true; }, canUndo ? 5000 : 2200);
+    if (!sticky) timer = setTimeout(function () { box.hidden = true; }, canUndo ? 5000 : 2200);
   }
 
   function changed(message) {
@@ -89,7 +89,7 @@
     if (context.characters) blocks.push("出场角色：\n" + context.characters);
     if (context.books) blocks.push("世界书：\n" + context.books);
     if (context.kind === "outline") {
-      blocks.push("先只写分集。每一集用「第 1 集：标题」开头，下一行写简介。不要写台词。");
+      blocks.push("先只写分集。结构没有规定集数时，按故事需要决定集数，不要为了凑数拆得很碎。每一集用「第 1 集：标题」开头，下一行写简介。不要写台词。");
     } else {
       if (context.episode) blocks.push("这一集：\n" + context.episode);
       if (context.previous) blocks.push("上一集结尾：\n" + context.previous);
@@ -390,15 +390,22 @@
       });
       if (!settings.baseUrl || !settings.apiKey) { toast("先填接口地址和密钥", false); return; }
       fetch(settings.baseUrl + "/models", { headers: { Authorization: "Bearer " + settings.apiKey } }).then(function (response) {
-        if (!response.ok) throw new Error(String(response.status));
-        return response.json();
+        return response.text().then(function (body) {
+          var data = {};
+          try { data = JSON.parse(body); } catch (err) {}
+          if (!response.ok) {
+            var detail = data && data.error ? (data.error.message || JSON.stringify(data.error)) : body;
+            throw new Error("接口返回 " + response.status + (detail ? "：" + String(detail).replace(/\s+/g, " ").slice(0, 240) : ""));
+          }
+          return data;
+        });
       }).then(function (data) {
         var names = ((data && data.data) || []).map(function (item) { return item.id; }).filter(Boolean);
-        if (!names.length) throw new Error("empty");
+        if (!names.length) throw new Error("接口没有返回模型列表");
         SG.saveSettings({ model: names[0], models: names });
         render();
         toast("已拉取 " + names.length + " 个模型", false);
-      }).catch(function () { toast("没能拉取，可以手填模型名", false); });
+      }).catch(function (err) { toast(err && err.message ? err.message : "没能拉取，可以手填模型名", false, true); });
       return;
     }
     if (action === "add-profile") { var profile = SG.addProfile(); render(); focusName("profile-name", profile); return; }
@@ -476,7 +483,7 @@
         toast("已保存生成稿", false);
       }).catch(function (err) {
         render();
-        toast(err && err.message ? err.message : "请求停了，已经得到的稿还在", false);
+        toast(err && err.message ? err.message : "请求停了，已经得到的稿还在", false, true);
       });
     });
   }
