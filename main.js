@@ -364,7 +364,14 @@
       return;
     }
     if (action === "fetch-models") {
-      var settings = SG.settings();
+      var urlInput = document.querySelector('[data-action="setting-url"]');
+      var keyInput = document.querySelector('[data-action="setting-key"]');
+      var modelInput = document.querySelector('[data-action="setting-model"]');
+      var settings = SG.saveSettings({
+        baseUrl: urlInput ? urlInput.value : SG.settings().baseUrl,
+        apiKey: keyInput ? keyInput.value : SG.settings().apiKey,
+        model: modelInput ? modelInput.value : SG.settings().model
+      });
       if (!settings.baseUrl || !settings.apiKey) { toast("先填接口地址和密钥", false); return; }
       fetch(settings.baseUrl + "/models", { headers: { Authorization: "Bearer " + settings.apiKey } }).then(function (response) {
         if (!response.ok) throw new Error(String(response.status));
@@ -489,7 +496,8 @@
       return;
     }
     if (action === "platform-help") {
-      window.alert("台词里用普通括号写标记名，例如：妈妈，(轻笑)我饿了。\n\n换平台时，点复制模板，把每一行右边换成那个平台要的标记，保存成 txt。再点导入标签预设。可以选择另存一套，或替换当前这套。\n\n停顿可以写范围，例如 <#0.2-0.6#>。每次导出会在范围内随机取一个数。\n\n勾选平台标签后，只替换纯人声 TXT 和按角色拆开的 TXT。预设里没有的括号会原样保留。");
+      var help = document.getElementById("platform-help");
+      if (help) help.hidden = !help.hidden;
       return;
     }
     if (action === "link-book") {
@@ -511,8 +519,14 @@
         var prepared = SG.prepareText(text);
         if (!prepared.text) { toast("这份文件没有正文", false); return; }
         remember();
-        var created = action === "upload-persona" ? SG.importPersona(prepared.text) : SG.importMaterial(kind, prepared.text);
-        changed(prepared.truncated ? "已导入前 20000 字，后面没有收" : "已导入，名称留空，请自己填");
+        var created;
+        try {
+          created = action === "upload-persona" ? SG.importPersona(prepared.text) : SG.importMaterial(kind, prepared.text, material.name);
+        } catch (err) {
+          toast(err && err.code === "duplicate-name" ? "已经有同名的了，换一个文件名" : "没有导入", false);
+          return;
+        }
+        changed(prepared.truncated ? "已导入前 20000 字，后面没有收" : "已导入");
         if (action === "upload-persona") focusName("persona-name", created);
         else focusName(kind === "book" ? "book-name" : "character-name", created);
       }).catch(function () {
@@ -565,7 +579,16 @@
     }
   }
 
-  document.addEventListener("click", onClick);
+  document.addEventListener("click", function (event) {
+    var box = document.getElementById("toast");
+    if (box && !box.hidden && event.target === box) box.hidden = true;
+    onClick(event);
+  });
+  document.addEventListener("touchstart", function (event) {
+    if (event.touches && event.touches.length > 1) event.preventDefault();
+  }, { passive: false });
+  document.addEventListener("dblclick", function (event) { event.preventDefault(); });
+  document.addEventListener("gesturestart", function (event) { event.preventDefault(); });
   document.addEventListener("input", field);
   document.addEventListener("change", function (event) {
     var el = event.target;

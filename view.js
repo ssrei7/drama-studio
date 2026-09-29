@@ -111,6 +111,8 @@
         '<label class="check"><input type="checkbox" data-action="export-choice" data-kind="tags"' + (choices.tags ? " checked" : "") + "><span>平台标签</span></label>" +
         '<button type="button" class="icon" data-action="platform-help" aria-label="平台标签教程">?</button>' +
       "</div>" +
+      '<p class="help" id="platform-help" hidden>台词里用普通括号写标记名，例如：妈妈，(轻笑)我饿了。换平台时，复制模板，把右边换成那个平台的标记，保存成 txt 再导入。可以另存一套，或替换当前这套。停顿写 <#0.2-0.6#> 时，每次导出随机取一个数。预设里没有的括号会原样保留。内置 MiniMax 不能删除。</p>' +
+      "</div>" +
       '<p class="hint tight">当前标签预设：' + SG.esc(platform ? platform.name || "未命名" : "还没有") + '。只替换纯人声和按角色拆开的文本。</p>' +
       (tracks ? '<p class="hint tight">勾选要放进同一个文件的音轨。</p><div class="checks">' + tracks + "</div>" : "") +
       '<button type="button" class="primary" data-action="export-files"' + (any ? "" : " disabled") + ">下载勾选的文件</button>" +
@@ -138,9 +140,7 @@
       return '' +
         '<article class="card">' +
           '<div class="card-head"><input class="name" data-action="character-name" data-id="' + SG.esc(character.id) + '" value="' + SG.esc(character.name) + '" maxlength="32" placeholder="角色名，自己填写"><button type="button" data-action="delete-character" data-id="' + SG.esc(character.id) + '">删除</button></div>' +
-          '<details' + (SG.ui.openId === character.id ? " open" : "") + '><summary>正文</summary><label class="text-label">角色卡<textarea data-action="character-body" data-id="' + SG.esc(character.id) + '" rows="4" placeholder="可自己写，也可导入 txt 或 docx">' + SG.esc(character.body || "") + "</textarea></label></details>" +
-          "<p class=\"hint tight\">绑定世界书，可多选。</p>" +
-          bookChecks(project, character) +
+          '<details' + (SG.ui.openId === character.id ? " open" : "") + '><summary>正文和绑定</summary><label class="text-label">角色卡<textarea data-action="character-body" data-id="' + SG.esc(character.id) + '" rows="4" placeholder="可自己写，也可导入 txt 或 docx">' + SG.esc(character.body || "") + "</textarea></label><p class=\"hint tight\">绑定世界书，可多选。</p>" + bookChecks(project, character) + "</details>" +
         "</article>";
     }).join("");
     if (!cards) cards = '<div class="empty"><p>还没有角色卡。配音稿里仍用角色名区分说话人。</p></div>';
@@ -307,7 +307,7 @@
         var active = project && item.id === project.id ? " active" : "";
         return '<li class="' + active + '"><button type="button" data-action="open-project" data-id="' + SG.esc(item.id) + '"><strong>' + SG.esc(item.name || "未命名广播剧") + "</strong><span>" + SG.esc(SG.formatTime(item.updatedAt)) + "</span></button></li>";
       }).join("") + "</ul>" : '<p class="hint">还没有别的项目。</p>';
-      body += '<div class="sheet-actions"><button type="button" data-action="new-project">新建空白</button><button type="button" data-action="new-demo">放入示例</button></div>';
+      body += '<div class="sheet-actions"><button type="button" data-action="show-steps">教程</button><button type="button" data-action="new-project">新建空白</button><button type="button" data-action="new-demo">放入示例</button></div>';
     } else if (kind === "steps") {
       title = "教程";
       body = '' +
@@ -351,7 +351,7 @@
         '<button type="button"' + (tab === "voice" ? ' class="on"' : "") + ' data-action="tab" data-tab="voice">配音稿</button>' +
         '<button type="button"' + (tab === "people" ? ' class="on"' : "") + ' data-action="tab" data-tab="people">角色</button>' +
         '<button type="button"' + (tab === "books" ? ' class="on"' : "") + ' data-action="tab" data-tab="books">世界书</button>' +
-        '<button type="button"' + (tab === "persona" ? ' class="on"' : "") + ' data-action="tab" data-tab="persona">人设</button>' +
+        '<button type="button"' + (tab === "persona" ? ' class="on"' : "") + ' data-action="tab" data-tab="persona">用户</button>' +
       "</nav>" +
       episodeBar(project) +
       '<main class="panel" data-panel="' + tab + '">' + panel + "</main>" +

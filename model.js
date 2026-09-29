@@ -12,6 +12,7 @@
   var BUILTIN_STYLE_ID = "builtin-otome";
   var BUILTIN_SHORT_ID = "builtin-short";
   var BUILTIN_SERIAL_ID = "builtin-serial";
+  var BUILTIN_PLATFORM_ID = "builtin-minimax";
 
   var TYPES = [
     { id: "dialogue", label: "对白", voice: true, placeholder: "写下要念的台词" },
@@ -339,18 +340,54 @@
       db.activeStructureId = BUILTIN_SHORT_ID;
     }
     if (!Array.isArray(db.platforms)) db.platforms = [];
+    var builtinRows = parsePlatform(builtinPlatformText());
+    var foundPlatform = false;
     db.platforms.forEach(function (item) {
       if (!item.id) item.id = uid();
       item.name = String(item.name || "").slice(0, 32);
+      item.builtin = !!item.builtin;
       if (!Array.isArray(item.rows)) item.rows = [];
+      if (item.id === BUILTIN_PLATFORM_ID) {
+        item.name = "MiniMax";
+        item.builtin = true;
+        item.rows = builtinRows;
+        foundPlatform = true;
+      }
     });
+    if (!foundPlatform) db.platforms.unshift({ id: BUILTIN_PLATFORM_ID, name: "MiniMax", builtin: true, rows: builtinRows });
     if (!db.platforms.some(function (item) { return item.id === db.activePlatformId; })) {
       db.activePlatformId = db.platforms[0] ? db.platforms[0].id : null;
     }
   }
 
+  function builtinPlatformText() {
+    return [
+      "轻笑 (chuckle)",
+      "轻咳 (coughs lightly)",
+      "喘气 (pant)",
+      "吸气 (inhale)",
+      "呼气 (exhale)",
+      "倒吸气 (gasps)",
+      "吸鼻子 (sniff)",
+      "叹气 (sigh)",
+      "倒吸气 (gasp)",
+      "呻吟 (groan)",
+      "咳嗽 (cough)",
+      "清嗓子 (clears throat)",
+      "咕哝 (murmur)",
+      "抽泣 (crying loudly)",
+      "呼气 (exhale sharply)",
+      "笑 (chuckle)",
+      "喘息 (pant)",
+      "抽泣 (sobbing)",
+      "哭腔 (crying)",
+      "掌声 (applause)",
+      "停一下 <#0.2-0.6#>"
+    ].join("\n");
+  }
+
   function platformTemplate() {
-    return "轻笑 (chuckle)\n叹气 (sighs)\n停一下 <#0.2-0.6#>";
+    return "轻笑 (chuckle)\n叹气 (sigh)\n停一下 <#0.2-0.6#>";
   }
 
   function parsePlatform(text) {
@@ -377,6 +414,7 @@
   function savePlatform(name, text, replaceId) {
     var rows = parsePlatform(text);
     if (!rows.length) throw new Error("没有认出标签");
+    if (replaceId === BUILTIN_PLATFORM_ID) throw new Error("内置预设不能替换");
     if (replaceId) {
       for (var i = 0; i < db.platforms.length; i++) {
         if (db.platforms[i].id === replaceId) {
@@ -398,9 +436,13 @@
   }
 
   function deletePlatform(id) {
+    var target = null;
+    db.platforms.forEach(function (item) { if (item.id === id) target = item; });
+    if (!target || target.builtin) return false;
     db.platforms = db.platforms.filter(function (item) { return item.id !== id; });
     if (db.activePlatformId === id) db.activePlatformId = db.platforms[0] ? db.platforms[0].id : null;
     persist();
+    return true;
   }
 
   function usePlatform(id) {
@@ -851,19 +893,22 @@
     touch();
   }
 
-  function importMaterial(kind, body) {
+  function importMaterial(kind, body, name) {
     var project = current();
     if (!project) return "";
     var text = clipText(body);
+    var title = String(name || "").replace(/\.(txt|docx)$/i, "").slice(0, 32);
+    var list = kind === "book" ? project.books : project.characters;
+    if (nameTaken(list, title, "")) throw duplicateNameError();
     if (kind === "book") {
-      var book = { id: uid(), name: "", body: text };
+      var book = { id: uid(), name: title, body: text };
       project.books.push(book);
       touch();
       return book.id;
     }
     var character = {
       id: uid(),
-      name: "",
+      name: title,
       color: PALETTE[project.characters.length % PALETTE.length],
       body: text,
       bookIds: []
@@ -1686,7 +1731,7 @@
     var hidden = analyze(sample, omit);
     check(hidden.omittedCount === 1 && hidden.text === "【林夏】\n我还在。" && hidden.voiceCount === 1, "temporary omit: " + hidden.text);
     check(spoken.inVoice === true, "omit does not edit line");
-    var platformId = savePlatform("MiniMax", platformTemplate(), "");
+    var platformId = savePlatform("测试平台", platformTemplate(), "");
     var marked = applyPlatform("妈妈，(轻笑)我饿了。(小声)", activePlatform(), function () { return 0; });
     check(marked === "妈妈，(chuckle)我饿了。(小声)", "platform mark: " + marked);
     var pause = applyPlatform("(停一下)", activePlatform(), function () { return 1; });

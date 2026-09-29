@@ -85,11 +85,7 @@ h1, h2, p { margin-top: 0; }
 .tabs .on { background: var(--ink); color: var(--bg); border-color: transparent; }
 .panel { padding: 0 16px 28px; }
 .panel { width: min(820px, 100%); margin-inline: auto; }
-footer {
-  width: min(820px, 100%); margin-inline: auto;
-  display: flex; justify-content: space-between; gap: 12px; align-items: center;
-  padding: 8px 16px calc(16px + var(--safe-bottom)); color: var(--muted);
-}
+footer { display: none; }
 
 .line, .person, .empty {
   background: var(--paper); border-radius: 18px; padding: 12px; margin-bottom: 10px; box-shadow: var(--shadow);
@@ -105,7 +101,10 @@ footer {
 .pill.on { background: color-mix(in srgb, var(--ink) 12%, transparent); }
 select, textarea, .name, .emotion-label input, .title {
   border: 1px solid var(--line); border-radius: 12px; background: transparent; padding: 8px 10px;
+  font-size: 16px;
 }
+html { touch-action: manipulation; }
+.help { white-space: pre-wrap; }
 textarea { width: 100%; resize: vertical; min-height: 44px; }
 .text-label, .emotion-label { margin-top: 8px; }
 .emotion-label { grid-template-columns: auto minmax(0, 1fr); align-items: center; }
