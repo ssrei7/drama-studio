@@ -46,6 +46,8 @@
     else if (action === "setting-key") SG.saveSettings({ apiKey: el.value });
     else if (action === "setting-url") SG.saveSettings({ baseUrl: el.value });
     else if (action === "platform-text") SG.setPlatformText(id, el.value);
+    else if (action === "core-prompt") SG.setCorePrompt(el.value);
+    else if (action === "story-prompt") SG.setStoryPrompt(el.value);
     else if (action === "rename") SG.rename(el.value);
     else return;
     undo = null;
@@ -83,6 +85,7 @@
   function promptText(context) {
     var blocks = [];
     if (context.core) blocks.push("核心要求：\n" + context.core);
+    if (context.story) blocks.push("这次的情节：\n" + context.story + "\n按这个情节写。");
     blocks.push("文风：\n" + context.style);
     blocks.push("结构：\n" + context.structure);
     if (context.persona) blocks.push("用户人设：\n" + context.persona);
@@ -98,7 +101,7 @@
       blocks.push("按这个格式回稿：\n【林夏】\n你还没走。\n情绪：放轻\n我以为末班车会在路口等。\n\n【旁白】\n夜班公交已经停了。");
       var platform = SG.activePlatform();
       var marks = platform && platform.rows ? platform.rows.map(function (row) { return row.name; }).filter(Boolean) : [];
-      if (marks.length) blocks.push("需要语气、声音或停顿时，把标记名用普通括号直接写进台词，例如：妈妈，(轻笑)我饿了。只能使用这些标记名：" + marks.join("、") + "。不要把平台符号写进台词。");
+      if (marks.length) blocks.push("视上下文语境，在台词中用普通括号加入语气、声音或停顿。括号里只能有指定标记名，不能有其他文字，例如：妈妈，(轻笑)我饿了。可用标记名：" + marks.join("、") + "。不要每句都加，不适合语境就不要加。描写、解释和平台符号都不要写进括号。");
     }
     return blocks.join("\n\n");
   }

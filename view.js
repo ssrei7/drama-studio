@@ -279,6 +279,7 @@
         '<label class="text-label">密钥<input data-action="setting-key" type="password" value="' + SG.esc(settings.apiKey) + '" placeholder="' + (settings.hasKey ? "已保存" : "只留在这台设备，也会写入备份") + '"></label>' +
         '<div class="line-tools"><button type="button" data-action="fetch-models">拉取模型</button><button type="button" data-action="add-profile">另存一套接口</button></div>' +
         '<label class="text-label">核心提示词<textarea data-action="core-prompt" rows="3" placeholder="可空。有内容就放在发给模型的最前面。">' + SG.esc(project.corePrompt || "") + "</textarea></label>" +
+        '<label class="text-label">普通提示词<textarea data-action="story-prompt" rows="4" placeholder="可空。写这次想要的情节，留空就自由发挥。">' + SG.esc(project.storyPrompt || "") + "</textarea></label>" +
         '<p class="hint tight">当前结构：' + SG.esc(structure.name || "未命名") + "。" + (project.mode ? "这个项目已定为" + (project.mode === "serial" ? "长篇" : "短篇") + "。" : "第一次生成后就固定，不随预设再变。") + "</p>" +
       "</section>" +
       (project.mode === "serial"

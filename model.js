@@ -259,6 +259,7 @@
     if (!Array.isArray(project.cast)) project.cast = [];
     if (!Array.isArray(project.castNames)) project.castNames = [];
     project.corePrompt = clipText(project.corePrompt);
+    project.storyPrompt = clipText(project.storyPrompt);
     project.mode = project.mode === "serial" ? "serial" : project.mode === "short" ? "short" : "";
     if (!Array.isArray(project.episodes)) project.episodes = [];
     if (!Array.isArray(project.drafts)) project.drafts = [];
@@ -1237,6 +1238,13 @@
     touch();
   }
 
+  function setStoryPrompt(text) {
+    var project = current();
+    if (!project) return;
+    project.storyPrompt = clipText(text);
+    touch();
+  }
+
   function setEpisodeTitle(id, title) {
     var project = current();
     if (!project) return;
@@ -1521,6 +1529,7 @@
       mode: mode,
       kind: kind,
       core: project.corePrompt,
+      story: project.storyPrompt,
       style: style.text,
       structure: structure.text,
       persona: persona ? persona.name + "\n" + persona.body : "",
@@ -2041,6 +2050,7 @@
     activeEpisode: activeEpisode,
     workingLines: workingLines,
     setCorePrompt: setCorePrompt,
+    setStoryPrompt: setStoryPrompt,
     setEpisodeTitle: setEpisodeTitle,
     setEpisodeSummary: setEpisodeSummary,
     openEpisode: openEpisode,

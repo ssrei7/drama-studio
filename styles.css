@@ -73,7 +73,7 @@ h1, h2, p { margin-top: 0; }
   backdrop-filter: blur(10px);
 }
 .title { width: 100%; border: 0; background: transparent; text-align: center; font-size: 18px; }
-.top-space { height: calc(74px + var(--safe-top)); }
+.top-space { height: calc(126px + var(--safe-top)); }
 .tip, .warn, .hint { margin: 0 16px 12px; color: var(--muted); }
 .tip, .warn {
   display: flex; justify-content: space-between; gap: 12px; align-items: center;
@@ -81,8 +81,12 @@ h1, h2, p { margin-top: 0; }
 }
 .warn { color: var(--warn); }
 .pending {
-  position: fixed; z-index: 4; top: calc(58px + var(--safe-top)); left: 50%; transform: translateX(-50%);
+  position: fixed; z-index: 4; top: calc(112px + var(--safe-top)); left: 50%; transform: translateX(-50%);
   width: min(820px, calc(100% - 24px)); margin: 0; box-sizing: border-box;
+}
+.tabs {
+  position: fixed; z-index: 3; top: calc(62px + var(--safe-top)); left: 50%; transform: translateX(-50%);
+  box-sizing: border-box; margin: 0; padding-bottom: 8px; background: var(--bg);
 }
 .pending::before { content: ""; width: 9px; height: 9px; border-radius: 50%; background: currentColor; animation: pulse 1s infinite alternate; }
 @keyframes pulse { from { opacity: 0.25; } to { opacity: 1; } }
