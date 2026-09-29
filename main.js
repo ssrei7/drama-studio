@@ -166,15 +166,22 @@
       if (!ids.length) { toast("先勾选至少一集", false); return; }
     }
     var base = SG.safeName(project.name);
-    var count = 0;
-    if (choices.html) { download(base + "-完整本.html", SG.fullHtml(project, ids), "text/html;charset=utf-8"); count += 1; }
-    if (choices.voice) { download(base + "-人声.txt", SG.voiceText(project, ids, SG.ui.voiceOmit || {}, !!choices.tags)); count += 1; }
+    var files = [];
+    if (choices.html) files.push({ name: base + "-完整本.html", text: SG.fullHtml(project, ids) });
+    if (choices.voice) files.push({ name: base + "-人声.txt", text: SG.voiceText(project, ids, SG.ui.voiceOmit || {}, !!choices.tags) });
     if (choices.roles) {
-      var files = SG.roleTexts(project, ids, !!choices.tags);
-      if (!files.length) toast("勾选的音轨里没有角色台词", false);
-      else if (window.SGZip) { download(base + "-按角色.zip", window.SGZip.zip(files), "application/zip"); count += 1; }
+      var roles = SG.roleTexts(project, ids, !!choices.tags);
+      if (!roles.length) toast("勾选的音轨里没有角色台词", false);
+      else roles.forEach(function (file) { files.push(file); });
     }
-    if (count) toast("已开始下载 " + count + " 个文件", false);
+    if (!files.length) return;
+    if (files.length === 1) {
+      download(files[0].name, files[0].text);
+      toast("已开始下载", false);
+      return;
+    }
+    download(base + "-导出.zip", window.SGZip.zip(files), "application/zip");
+    toast("已打包成一个压缩包", false);
   }
 
   function copyText(text) {
