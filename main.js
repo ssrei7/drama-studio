@@ -96,6 +96,9 @@
       if (context.next) blocks.push("下一集开头：\n" + context.next);
       if (context.locked) blocks.push("这些行已锁定，不要改写：\n" + context.locked);
       blocks.push("按这个格式回稿：\n【林夏】\n你还没走。\n情绪：放轻\n我以为末班车会在路口等。\n\n【旁白】\n夜班公交已经停了。");
+      var platform = SG.activePlatform();
+      var marks = platform && platform.rows ? platform.rows.map(function (row) { return row.name; }).filter(Boolean) : [];
+      if (marks.length) blocks.push("需要语气、声音或停顿时，把标记名用普通括号直接写进台词，例如：妈妈，(轻笑)我饿了。只能使用这些标记名：" + marks.join("、") + "。不要把平台符号写进台词。");
     }
     return blocks.join("\n\n");
   }
@@ -599,6 +602,13 @@
   }
 
   document.addEventListener("pointerdown", function (event) {
+    var help = event.target.closest && event.target.closest("[data-action=\"platform-help\"]");
+    if (help) {
+      var panel = document.getElementById("platform-help");
+      if (panel) panel.hidden = !panel.hidden;
+      event.preventDefault();
+      return;
+    }
     var box = document.getElementById("toast");
     if (!box || box.hidden || box.contains(event.target)) return;
     box.hidden = true;
