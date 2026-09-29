@@ -143,7 +143,8 @@
         "</article>";
     }).join("");
     if (!cards) cards = '<div class="empty"><p>还没有角色卡。配音稿里仍用角色名区分说话人。</p></div>';
-    return castBox +
+    return '<p class="hint">角色卡和世界书全项目共用。出场勾选只属于当前项目。</p>' +
+      castBox +
       cards +
       '<div class="sheet-actions">' +
         '<button type="button" class="add-end" data-action="add-character">加角色卡</button>' +
@@ -165,7 +166,8 @@
         "</article>";
     }).join("");
     if (!cards) cards = '<div class="empty"><p>还没有世界书。一份世界书可以绑给多个角色。</p></div>';
-    return cards +
+    return '<p class="hint">世界书全项目共用。一份可以绑给多个角色。</p>' +
+      cards +
       '<div class="sheet-actions">' +
         '<button type="button" class="add-end" data-action="add-book">加世界书</button>' +
         '<label class="file">导入世界书<input type="file" accept=".txt,.docx,text/plain" data-action="upload-material" data-kind="book"></label>' +

@@ -257,6 +257,7 @@
     if (!Array.isArray(project.lines)) project.lines = [];
     if (!Array.isArray(project.books)) project.books = [];
     if (!Array.isArray(project.cast)) project.cast = [];
+    if (!Array.isArray(project.castNames)) project.castNames = [];
     project.corePrompt = clipText(project.corePrompt);
     project.mode = project.mode === "serial" ? "serial" : project.mode === "short" ? "short" : "";
     if (!Array.isArray(project.episodes)) project.episodes = [];
@@ -279,11 +280,8 @@
     project.characters.forEach(function (character) {
       character.bookIds = character.bookIds.filter(function (id) { return bookIds[id]; });
     });
-    var ids = {};
-    project.characters.forEach(function (character) { ids[character.id] = true; });
-    project.lines.forEach(function (line) { normalizeLine(line, ids); });
-    project.cast = project.cast.filter(function (id) { return ids[id]; });
-    project.episodes.forEach(function (episode) { normalizeEpisode(episode, ids); });
+    project.lines.forEach(function (line) { normalizeLine(line, {}); });
+    project.episodes.forEach(function (episode) { normalizeEpisode(episode, {}); });
     if (!project.episodes.some(function (episode) { return episode.id === project.activeEpisodeId; })) {
       project.activeEpisodeId = project.episodes[0] ? project.episodes[0].id : "";
     }
@@ -350,7 +348,69 @@
     return episode;
   }
 
+  function collectLibrary() {
+    if (!Array.isArray(db.characters)) db.characters = [];
+    if (!Array.isArray(db.books)) db.books = [];
+    var names = {};
+    db.characters.forEach(function (item) { if (item.name) names[item.name] = item.id; });
+    db.projects.forEach(function (project) {
+      var oldBooks = {};
+      (project.books || []).forEach(function (book) {
+        var existing = db.books.filter(function (item) { return item.name && item.name === book.name; })[0];
+        var target = existing || book;
+        if (!existing) db.books.push(book);
+        oldBooks[book.id] = target.id;
+      });
+      (project.characters || []).forEach(function (character) {
+        character.bookIds = (character.bookIds || []).map(function (id) { return oldBooks[id] || id; });
+        var existing = character.name ? db.characters.filter(function (item) { return item.name === character.name; })[0] : null;
+        if (!existing) {
+          db.characters.push(character);
+          if (character.name) names[character.name] = character.id;
+        }
+      });
+      project.castNames = (project.cast || []).map(function (id) {
+        var found = (project.characters || []).filter(function (item) { return item.id === id; })[0];
+        return found ? found.name : "";
+      }).filter(Boolean);
+      project.lines.concat((project.episodes || []).reduce(function (all, episode) { return all.concat(episode.lines || []); }, [])).forEach(function (line) {
+        var found = (project.characters || []).filter(function (item) { return item.id === line.speakerId; })[0];
+        if (found && names[found.name]) line.speakerId = names[found.name];
+      });
+      delete project.characters;
+      delete project.books;
+      delete project.cast;
+    });
+    db.characters.forEach(function (character) {
+      if (!character.id) character.id = uid();
+      character.name = String(character.name || "").slice(0, 32);
+      character.color = safeColor(character.color);
+      character.body = clipText(character.body);
+      if (!Array.isArray(character.bookIds)) character.bookIds = [];
+    });
+    db.books.forEach(function (book) {
+      if (!book.id) book.id = uid();
+      book.name = String(book.name || "").slice(0, 32);
+      book.body = clipText(book.body);
+    });
+    var bookIds = {};
+    db.books.forEach(function (book) { bookIds[book.id] = true; });
+    db.characters.forEach(function (character) {
+      character.bookIds = character.bookIds.filter(function (id) { return bookIds[id]; });
+    });
+    var characterIds = {};
+    db.characters.forEach(function (character) { characterIds[character.id] = true; });
+    db.projects.forEach(function (project) {
+      project.cast = project.castNames.map(function (name) { return names[name]; }).filter(function (id) { return characterIds[id]; });
+      project.lines.forEach(function (line) { if (!characterIds[line.speakerId]) line.speakerId = ""; });
+      project.episodes.forEach(function (episode) {
+        episode.lines.forEach(function (line) { if (!characterIds[line.speakerId]) line.speakerId = ""; });
+      });
+    });
+  }
+
   function ensureLibraries() {
+    collectLibrary();
     if (!Array.isArray(db.personas)) db.personas = [];
     if (!Array.isArray(db.styles)) db.styles = [];
     if (!Array.isArray(db.structures)) db.structures = [];
@@ -600,14 +660,24 @@
 
   function current() {
     for (var i = 0; i < db.projects.length; i++) {
-      if (db.projects[i].id === db.activeProjectId) return db.projects[i];
+      if (db.projects[i].id === db.activeProjectId) {
+        var project = db.projects[i];
+        project.characters = db.characters;
+        project.books = db.books;
+        return project;
+      }
     }
     return null;
   }
 
   function persist() {
     try {
-      localStorage.setItem(KEY, JSON.stringify(db));
+      var copy = JSON.parse(JSON.stringify(db));
+      copy.projects.forEach(function (project) {
+        delete project.characters;
+        delete project.books;
+      });
+      localStorage.setItem(KEY, JSON.stringify(copy));
       saveError = "";
     } catch (err) {
       saveError = "没能保存在这台设备上";
@@ -830,71 +900,52 @@
     var line = findLine(id);
     var project = current();
     if (!line || !project) return;
-    var ok = speakerId && project.characters.some(function (character) { return character.id === speakerId; });
+    var ok = speakerId && db.characters.some(function (character) { return character.id === speakerId; });
     line.speakerId = ok ? speakerId : "";
     touch();
   }
 
   function addCharacter() {
-    var project = current();
-    if (!project) return "";
     var character = {
       id: uid(),
       name: "",
-      color: PALETTE[project.characters.length % PALETTE.length]
+      color: PALETTE[db.characters.length % PALETTE.length],
+      body: "",
+      bookIds: []
     };
-    project.characters.push(character);
-    touch();
+    db.characters.push(character);
+    persist();
     return character.id;
   }
 
   function deleteCharacter(id) {
-    var project = current();
-    if (!project) return;
-    project.characters = project.characters.filter(function (character) { return character.id !== id; });
-    project.lines.forEach(function (line) {
-      if (line.speakerId === id) line.speakerId = "";
+    db.characters = db.characters.filter(function (character) { return character.id !== id; });
+    db.projects.forEach(function (project) {
+      project.cast = (project.cast || []).filter(function (item) { return item !== id; });
+      project.lines.forEach(function (line) { if (line.speakerId === id) line.speakerId = ""; });
+      project.episodes.forEach(function (episode) {
+        episode.lines.forEach(function (line) { if (line.speakerId === id) line.speakerId = ""; });
+      });
     });
-    touch();
+    persist();
   }
 
   function setCharacterName(id, name) {
-    var project = current();
-    if (!project) return;
     var clean = String(name || "").slice(0, 32);
-    if (nameTaken(project.characters, clean, id)) throw duplicateNameError();
-    for (var i = 0; i < project.characters.length; i++) {
-      if (project.characters[i].id === id) {
-        project.characters[i].name = clean;
-        touch();
-        return;
-      }
-    }
+    if (nameTaken(db.characters, clean, id)) throw duplicateNameError();
+    db.characters.forEach(function (item) { if (item.id === id) item.name = clean; });
+    persist();
   }
 
   function setCharacterColor(id, color) {
-    var project = current();
-    if (!project) return;
     if (!/^#[0-9a-fA-F]{6}$/.test(color || "")) return;
-    for (var i = 0; i < project.characters.length; i++) {
-      if (project.characters[i].id === id) {
-        project.characters[i].color = color;
-        touch();
-        return;
-      }
-    }
+    db.characters.forEach(function (item) { if (item.id === id) item.color = color; });
+    persist();
   }
 
   function setCharacterBody(id, body) {
-    var project = current();
-    if (!project) return;
-    for (var i = 0; i < project.characters.length; i++) {
-      if (project.characters[i].id === id) {
-        project.characters[i].body = clipText(body);
-        touch();
-        return;
-      }
-    }
+    db.characters.forEach(function (item) { if (item.id === id) item.body = clipText(body); });
+    persist();
   }
 
   function renameChecked(list, id, name, apply) {
@@ -910,94 +961,75 @@
   }
 
   function setCharacterNameChecked(id, name) {
-    var project = current();
-    if (!project) return;
-    if (renameChecked(project.characters, id, name, function (item, clean) { item.name = clean; })) touch();
+    if (renameChecked(db.characters, id, name, function (item, clean) { item.name = clean; })) persist();
   }
 
   function addBook() {
-    var project = current();
-    if (!project) return "";
     var book = { id: uid(), name: "", body: "" };
-    project.books.push(book);
-    touch();
+    db.books.push(book);
+    persist();
     return book.id;
   }
 
   function deleteBook(id) {
-    var project = current();
-    if (!project) return;
-    project.books = project.books.filter(function (book) { return book.id !== id; });
-    project.characters.forEach(function (character) {
+    db.books = db.books.filter(function (book) { return book.id !== id; });
+    db.characters.forEach(function (character) {
       character.bookIds = character.bookIds.filter(function (bookId) { return bookId !== id; });
     });
-    touch();
+    persist();
   }
 
   function setBookName(id, name) {
-    var project = current();
-    if (!project) return;
-    if (renameChecked(project.books, id, name, function (item, clean) { item.name = clean; })) touch();
+    if (renameChecked(db.books, id, name, function (item, clean) { item.name = clean; })) persist();
   }
 
   function setBookBody(id, body) {
-    var project = current();
-    if (!project) return;
-    for (var i = 0; i < project.books.length; i++) {
-      if (project.books[i].id === id) {
-        project.books[i].body = clipText(body);
-        touch();
-        return;
-      }
-    }
+    db.books.forEach(function (item) { if (item.id === id) item.body = clipText(body); });
+    persist();
   }
 
   function toggleBookLink(characterId, bookId) {
-    var project = current();
-    if (!project) return;
-    var character = null;
-    var book = false;
-    project.characters.forEach(function (item) { if (item.id === characterId) character = item; });
-    project.books.forEach(function (item) { if (item.id === bookId) book = true; });
-    if (!character || !book) return;
+    var character = db.characters.filter(function (item) { return item.id === characterId; })[0];
+    if (!character || !db.books.some(function (item) { return item.id === bookId; })) return;
     var index = character.bookIds.indexOf(bookId);
     if (index >= 0) character.bookIds.splice(index, 1);
     else character.bookIds.push(bookId);
-    touch();
+    persist();
   }
 
   function toggleCast(characterId) {
     var project = current();
-    if (!project) return;
-    if (!project.characters.some(function (item) { return item.id === characterId; })) return;
+    if (!project || !db.characters.some(function (item) { return item.id === characterId; })) return;
     var index = project.cast.indexOf(characterId);
     if (index >= 0) project.cast.splice(index, 1);
     else project.cast.push(characterId);
+    project.castNames = project.cast.map(function (id) {
+      var found = db.characters.filter(function (item) { return item.id === id; })[0];
+      return found ? found.name : "";
+    }).filter(Boolean);
     touch();
   }
 
   function importMaterial(kind, body, name) {
-    var project = current();
-    if (!project) return "";
     var text = clipText(body);
     var title = String(name || "").replace(/\.(txt|docx)$/i, "").slice(0, 32);
-    var list = kind === "book" ? project.books : project.characters;
+    var list = kind === "book" ? db.books : db.characters;
     if (nameTaken(list, title, "")) throw duplicateNameError();
     if (kind === "book") {
       var book = { id: uid(), name: title, body: text };
-      project.books.push(book);
-      touch();
+      db.books.push(book);
+      persist();
       return book.id;
     }
     var character = {
       id: uid(),
       name: title,
-      color: PALETTE[project.characters.length % PALETTE.length],
+      color: PALETTE[db.characters.length % PALETTE.length],
       body: text,
       bookIds: []
     };
-    project.characters.push(character);
-    touch();
+    db.characters.push(character);
+    persist();
     return character.id;
   }
 
@@ -1302,17 +1334,17 @@
   function findOrCreateSpeaker(project, name, kind) {
     var clean = String(name || "").trim().slice(0, 32);
     if (!clean || kind !== "dialogue") return "";
-    for (var i = 0; i < project.characters.length; i++) {
-      if (sameName(project.characters[i].name, clean)) return project.characters[i].id;
+    for (var i = 0; i < db.characters.length; i++) {
+      if (sameName(db.characters[i].name, clean)) return db.characters[i].id;
     }
     var character = {
       id: uid(),
       name: clean,
-      color: PALETTE[project.characters.length % PALETTE.length],
+      color: PALETTE[db.characters.length % PALETTE.length],
       body: "",
       bookIds: []
     };
-    project.characters.push(character);
+    db.characters.push(character);
     return character.id;
   }
 
@@ -1468,12 +1500,12 @@
     var style = activeStyle();
     var persona = activePersona();
     var mode = project.mode || (structure.kind === "serial" ? "serial" : "short");
-    var cast = project.cast.length ? project.cast : project.characters.map(function (item) { return item.id; });
-    var people = project.characters.filter(function (item) { return cast.indexOf(item.id) !== -1; });
+    var cast = project.cast.length ? project.cast : db.characters.map(function (item) { return item.id; });
+    var people = db.characters.filter(function (item) { return cast.indexOf(item.id) !== -1; });
     var books = [];
     people.forEach(function (person) {
       person.bookIds.forEach(function (bookId) {
-        var book = project.books.filter(function (item) { return item.id === bookId; })[0];
+        var book = db.books.filter(function (item) { return item.id === bookId; })[0];
         if (book && !books.some(function (item) { return item.id === book.id; })) books.push(book);
       });
     });
@@ -1671,7 +1703,7 @@
   function importProject(obj) {
     var project = obj;
     if (obj && obj.kind === "shenggao-project" && obj.project) project = obj.project;
-    if (!project || typeof project !== "object" || !Array.isArray(project.lines) || !Array.isArray(project.characters)) {
+    if (!project || typeof project !== "object" || !Array.isArray(project.lines)) {
       throw new Error("这不是台本工作室的备份");
     }
     project = JSON.parse(JSON.stringify(project));
