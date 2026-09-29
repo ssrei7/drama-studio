@@ -508,10 +508,7 @@
       SG.ui.exportEpisodes[id] = el.checked;
       return;
     }
-    if (action === "export-files") {
-      exportFiles();
-      return;
-    }
+    if (action === "export-files") { exportFiles(); return; }
     if (action === "copy-platform-template") {
       copyText(SG.platformTemplate());
       toast("模板已复制。左边是台词里的名字，右边是平台标记。", false);
