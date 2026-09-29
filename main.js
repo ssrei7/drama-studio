@@ -599,8 +599,13 @@
   }
 
   document.addEventListener("pointerdown", function (event) {
-    var help = event.target.closest && event.target.closest("[data-action=\"platform-help\"]");
-    if (help) {
+    var hit = event.target.closest && event.target.closest("[data-action]");
+    if (hit && hit.getAttribute("data-action") === "export-files") {
+      exportFiles();
+      event.preventDefault();
+      return;
+    }
+    if (hit && hit.getAttribute("data-action") === "platform-help") {
       var panel = document.getElementById("platform-help");
       if (panel) panel.hidden = !panel.hidden;
       event.preventDefault();
@@ -610,11 +615,15 @@
     if (!box || box.hidden || box.contains(event.target)) return;
     box.hidden = true;
   });
-  document.addEventListener("click", onClick);
+  document.addEventListener("click", function (event) {
+    var hit = event.target.closest && event.target.closest("[data-action]");
+    var action = hit && hit.getAttribute("data-action");
+    if (action === "export-files" || action === "platform-help") return;
+    onClick(event);
+  });
   document.addEventListener("touchstart", function (event) {
     if (event.touches && event.touches.length > 1) event.preventDefault();
   }, { passive: false });
-  document.addEventListener("dblclick", function (event) { event.preventDefault(); });
   document.addEventListener("gesturestart", function (event) { event.preventDefault(); });
   document.addEventListener("input", field);
   document.addEventListener("change", function (event) {
