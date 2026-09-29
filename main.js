@@ -449,11 +449,9 @@
     if (!project) return;
     var count = action === "generate-all" ? project.episodes.length : 1;
     if (!count) { toast("还没有分集", false); return; }
-    ask("这次将请求 " + count + " 次。生成稿单独保存，不会直接改导演本。").then(function (ok) {
-      if (!ok) return;
-      window.SGPending = "正在请求接口，请稍等";
-      render();
-      var job;
+    window.SGPending = "正在请求接口，请稍等";
+    render();
+    var job;
       if (action === "generate-outline") job = requestModel(SG.generationContext("outline")).then(function (text) {
         var items = SG.parseOutline(text);
         if (!items.length) throw new Error("没有认出分集");
@@ -480,7 +478,7 @@
           });
         });
       }
-      job.then(function () {
+    job.then(function () {
         window.SGPending = "";
         render();
         toast("已保存生成稿", false);
@@ -489,7 +487,6 @@
         render();
         toast(err && err.message ? err.message : "请求停了，已经得到的稿还在", false, true);
       });
-    });
   }
 
   function focusLine(id) {
