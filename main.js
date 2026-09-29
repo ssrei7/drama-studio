@@ -451,7 +451,8 @@
     if (!count) { toast("还没有分集", false); return; }
     ask("这次将请求 " + count + " 次。生成稿单独保存，不会直接改导演本。").then(function (ok) {
       if (!ok) return;
-      toast("正在请求", true);
+      window.SGPending = "正在请求接口，请稍等";
+      render();
       var job;
       if (action === "generate-outline") job = requestModel(SG.generationContext("outline")).then(function (text) {
         var items = SG.parseOutline(text);
@@ -471,7 +472,8 @@
         project.episodes.forEach(function (episode) {
           job = job.then(function () {
             index += 1;
-            toast("正在请求 " + index + " / " + count, true);
+            window.SGPending = "正在请求 " + index + " / " + count;
+            render();
             return requestModel(SG.generationContext("script", episode)).then(function (text) {
               SG.saveDraft(text, episode.title || ("第" + index + "集"), "");
             });
@@ -479,9 +481,11 @@
         });
       }
       job.then(function () {
+        window.SGPending = "";
         render();
         toast("已保存生成稿", false);
       }).catch(function (err) {
+        window.SGPending = "";
         render();
         toast(err && err.message ? err.message : "请求停了，已经得到的稿还在", false, true);
       });

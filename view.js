@@ -358,6 +358,7 @@
         '<button type="button" data-action="show-backup">备份</button>' +
       "</header>" +
       '<div class="top-space"></div>' +
+      (window.SGPending ? '<p class="warn pending">' + SG.esc(window.SGPending) + "</p>" : "") +
       (save ? '<p class="warn">' + SG.esc(save) + "</p>" : "") +
       tip +
       '<nav class="tabs" aria-label="编辑分区">' +
