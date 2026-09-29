@@ -111,8 +111,7 @@
         '<label class="check"><input type="checkbox" data-action="export-choice" data-kind="tags"' + (choices.tags ? " checked" : "") + "><span>平台标签</span></label>" +
         '<button type="button" class="icon" data-action="platform-help" aria-label="平台标签教程">?</button>' +
       "</div>" +
-      '<p class="help" id="platform-help" hidden>台词里用普通括号写标记名，例如：妈妈，(轻笑)我饿了。换平台时，复制模板，把右边换成那个平台的标记，保存成 txt 再导入。可以另存一套，或替换当前这套。停顿写 <#0.2-0.6#> 时，每次导出随机取一个数。预设里没有的括号会原样保留。内置 MiniMax 不能删除。</p>' +
-      "</div>" +
+      '<p class="help" id="platform-help" hidden>台词里用普通括号写标记名，例如：妈妈，(轻笑)我饿了。换平台时，复制模板，把右边换成那个平台的标记，保存成 txt 再导入。可以另存一套，或替换当前这套。停顿写 <#0.2-0.6#> 时，每次导出随机取一个数。预设里没有的括号会原样保留。内置 MiniMax 不能删除。平台标签只在导出配音稿时替换，生成时不会发给文本模型。</p>' +
       '<p class="hint tight">当前标签预设：' + SG.esc(platform ? platform.name || "未命名" : "还没有") + '。只替换纯人声和按角色拆开的文本。</p>' +
       (tracks ? '<p class="hint tight">勾选要放进同一个文件的音轨。</p><div class="checks">' + tracks + "</div>" : "") +
       '<button type="button" class="primary" data-action="export-files"' + (any ? "" : " disabled") + ">下载勾选的文件</button>" +

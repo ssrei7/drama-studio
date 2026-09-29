@@ -598,11 +598,12 @@
     }
   }
 
-  document.addEventListener("click", function (event) {
+  document.addEventListener("pointerdown", function (event) {
     var box = document.getElementById("toast");
-    if (box && !box.hidden && event.target === box) box.hidden = true;
-    onClick(event);
+    if (!box || box.hidden || box.contains(event.target)) return;
+    box.hidden = true;
   });
+  document.addEventListener("click", onClick);
   document.addEventListener("touchstart", function (event) {
     if (event.touches && event.touches.length > 1) event.preventDefault();
   }, { passive: false });
@@ -613,7 +614,7 @@
     var el = event.target;
     if (!el || !el.getAttribute) return;
     var action = el.getAttribute("data-action");
-    if (action === "character-name" || action === "book-name" || action === "persona-name" || action === "style-name" || action === "structure-name") {
+    if (action === "character-name" || action === "book-name" || action === "persona-name" || action === "style-name" || action === "structure-name" || action === "profile-name" || action === "platform-name") {
       named(action, el.getAttribute("data-id"), el.value);
       return;
     }

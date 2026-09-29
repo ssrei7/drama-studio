@@ -161,6 +161,7 @@ textarea[readonly] { color: var(--muted); }
 .steps .next span { outline: 2px solid var(--accent); }
 .steps p { margin: 2px 0 0; color: var(--muted); }
 
+[hidden] { display: none !important; }
 #toast {
   position: fixed; z-index: 5; left: 50%; bottom: calc(18px + var(--safe-bottom)); transform: translateX(-50%);
   display: flex; gap: 10px; align-items: center; width: min(420px, calc(100% - 24px));
