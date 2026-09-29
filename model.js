@@ -609,8 +609,8 @@
     var rows = platform && platform.rows ? platform.rows : [];
     var map = {};
     rows.forEach(function (row) { map[row.name] = row.mark; });
-    return String(text || "").replace(/\(([^()\n]{1,32})\)/g, function (all, name) {
-      if (!Object.prototype.hasOwnProperty.call(map, name)) return all;
+    return String(text || "").replace(/[（(]([^()（）\n]{1,32})[）)]/g, function (all, name) {
+      if (!Object.prototype.hasOwnProperty.call(map, name)) return "";
       return randomPause(map[name], random);
     });
   }
@@ -1853,8 +1853,8 @@
     check(hidden.omittedCount === 1 && hidden.text === "【林夏】\n我还在。" && hidden.voiceCount === 1, "temporary omit: " + hidden.text);
     check(spoken.inVoice === true, "omit does not edit line");
     var platformId = savePlatform("测试平台", platformTemplate(), "");
-    var marked = applyPlatform("妈妈，(轻笑)我饿了。(小声)", activePlatform(), function () { return 0; });
-    check(marked === "妈妈，(chuckle)我饿了。(小声)", "platform mark: " + marked);
+    var marked = applyPlatform("妈妈，（轻笑）我饿了。（她看了看碗）", activePlatform(), function () { return 0; });
+    check(marked === "妈妈，(chuckle)我饿了。", "platform mark: " + marked);
     var pause = applyPlatform("(停一下)", activePlatform(), function () { return 1; });
     check(pause === "<#0.60#>", "pause range: " + pause);
     var taggedVoice = voiceText({ characters: chars, lines: [newLine({ type: "dialogue", speakerId: lin, text: "(轻笑)来。" })], includeMonologue: true, episodes: [] }, [], {}, true);
