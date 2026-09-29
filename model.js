@@ -1879,11 +1879,13 @@
       toggleBookLink(card, bookA);
       toggleCast(card);
       var now = current();
-      check(now.characters[0].name === "林夏" && now.characters[0].body === "角色正文", "card body");
-      check(now.characters[0].bookIds.length === 1 && now.characters[0].bookIds[0] === bookB, "link many: " + now.characters[0].bookIds.join(","));
+      var madeCard = now.characters.filter(function (item) { return item.id === card; })[0];
+      check(!!madeCard && madeCard.name === "林夏" && madeCard.body === "角色正文", "card body");
+      check(!!madeCard && madeCard.bookIds.length === 1 && madeCard.bookIds[0] === bookB, "link many: " + (madeCard ? madeCard.bookIds.join(",") : ""));
       check(now.cast.length === 1 && now.cast[0] === card, "cast");
       deleteBook(bookB);
-      check(current().characters[0].bookIds.length === 0, "link cleared");
+      var cleared = current().characters.filter(function (item) { return item.id === card; })[0];
+      check(!!cleared && cleared.bookIds.length === 0, "link cleared");
 
       var persona = importPersona("听众设定");
       setPersonaName(persona, "听众");
