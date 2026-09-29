@@ -262,12 +262,21 @@
       if (!items.length && folder.id) return;
       groups += "<section class=\"block\"><h2>" + SG.esc(folder.name || "未分类") + "</h2>" + (items.length ? items.map(function (draft) { return draftCard(project, draft); }).join("") : '<p class="hint tight">这里还没有生成稿。</p>') + "</section>";
     });
+    var profiles = SG.profiles().map(function (profile) {
+      return '<option value="' + SG.esc(profile.id) + '"' + (profile.id === settings.id ? " selected" : "") + '>' + SG.esc(profile.name || "未命名接口") + "</option>";
+    }).join("");
+    var models = (settings.models || []).map(function (model) {
+      return '<option value="' + SG.esc(model) + '">' + SG.esc(model) + "</option>";
+    }).join("");
     return '' +
       '<section class="block"><h2>接口</h2>' +
+        '<label class="text-label">接口配置<select data-action="use-profile">' + profiles + '</select></label>' +
+        '<div class="card-head"><input class="name" data-action="profile-name" data-id="' + SG.esc(settings.id) + '" value="' + SG.esc(settings.name) + '" maxlength="32" placeholder="配置名称"><button type="button" data-action="delete-profile" data-id="' + SG.esc(settings.id) + '">删除这套</button></div>' +
         '<label class="text-label">接口地址<input data-action="setting-url" value="' + SG.esc(settings.baseUrl) + '" placeholder="https://example.com/v1"></label>' +
-        '<label class="text-label">模型<input data-action="setting-model" value="' + SG.esc(settings.model) + '" placeholder="模型名"></label>' +
+        '<label class="text-label">模型<select data-action="setting-model"><option value="">' + (settings.models && settings.models.length ? "选择模型" : "先拉取模型") + '</option>' + models + '</select></label>' +
+        '<input data-action="setting-model-text" value="' + SG.esc(settings.model) + '" placeholder="也可以手填模型名">' +
         '<label class="text-label">密钥<input data-action="setting-key" type="password" value="' + SG.esc(settings.apiKey) + '" placeholder="' + (settings.hasKey ? "已保存" : "只留在这台设备，也会写入备份") + '"></label>' +
-        '<div class="line-tools"><button type="button" data-action="fetch-models">拉取模型</button><button type="button" data-action="save-settings">保存接口</button></div>' +
+        '<div class="line-tools"><button type="button" data-action="fetch-models">拉取模型</button><button type="button" data-action="add-profile">另存一套接口</button></div>' +
         '<label class="text-label">核心提示词<textarea data-action="core-prompt" rows="3" placeholder="可空。有内容就放在发给模型的最前面。">' + SG.esc(project.corePrompt || "") + "</textarea></label>" +
         '<p class="hint tight">当前结构：' + SG.esc(structure.name || "未命名") + "。" + (project.mode ? "这个项目已定为" + (project.mode === "serial" ? "长篇" : "短篇") + "。" : "第一次生成后就固定，不随预设再变。") + "</p>" +
       "</section>" +
@@ -287,7 +296,15 @@
         '<button type="button" class="add-end" data-action="add-style">加文风</button></section>' +
       '<section class="block"><h2>结构</h2><p class="hint tight">短篇小剧场和长篇分集只读。复制副本后再改，副本可以删除。这一步只保存，不生成。</p>' +
         presetList(SG.structures(), structureId, "structure") +
-        '<button type="button" class="add-end" data-action="add-structure">加结构</button></section>';
+        '<button type="button" class="add-end" data-action="add-structure">加结构</button></section>' +
+      '<section class="block"><h2>平台标签</h2><p class="hint tight">内置 MiniMax 不能删。点正文查看，复制副本后再改。</p>' +
+        SG.platforms().map(function (platform) {
+          var on = SG.activePlatform() && SG.activePlatform().id === platform.id;
+          var text = platform.rows.map(function (row) { return row.name + " " + row.mark; }).join("\n");
+          var locked = !!platform.builtin;
+          return '<article class="card' + (on ? " picked" : "") + '"><div class="card-head">' + (locked ? '<strong>' + SG.esc(platform.name) + '</strong>' : '<input class="name" data-action="platform-name" data-id="' + SG.esc(platform.id) + '" value="' + SG.esc(platform.name) + '" maxlength="32" placeholder="预设名称">') + (locked ? "" : '<button type="button" data-action="delete-platform" data-id="' + SG.esc(platform.id) + '">删除</button>') + '</div><details' + (SG.ui.openId === platform.id ? " open" : "") + '><summary>查看</summary><textarea data-action="platform-text" data-id="' + SG.esc(platform.id) + '" rows="8"' + (locked ? " readonly" : "") + '>' + SG.esc(text) + '</textarea></details><div class="line-tools">' + (on ? '<span class="hint tight">当前使用</span>' : '<button type="button" data-action="use-platform" data-id="' + SG.esc(platform.id) + '">改用这一套</button>') + '<button type="button" data-action="copy-platform" data-id="' + SG.esc(platform.id) + '">复制副本</button></div></article>';
+        }).join("") +
+      "</section>";
   }
 
   function steps() {

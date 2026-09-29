@@ -42,6 +42,10 @@
     else if (action === "persona-body") SG.setPersonaBody(id, el.value);
     else if (action === "style-text") SG.setStyleText(id, el.value);
     else if (action === "structure-text") SG.setStructureText(id, el.value);
+    else if (action === "setting-model-text") SG.saveSettings({ model: el.value });
+    else if (action === "setting-key") SG.saveSettings({ apiKey: el.value });
+    else if (action === "setting-url") SG.saveSettings({ baseUrl: el.value });
+    else if (action === "platform-text") SG.setPlatformText(id, el.value);
     else if (action === "rename") SG.rename(el.value);
     else return;
     undo = null;
@@ -54,6 +58,8 @@
       else if (action === "persona-name") SG.setPersonaName(id, value);
       else if (action === "style-name") SG.setStyleName(id, value);
       else if (action === "structure-name") SG.setStructureName(id, value);
+      else if (action === "profile-name") SG.setProfileName(id, value);
+      else if (action === "platform-name") SG.setPlatformName(id, value);
       else return false;
       undo = null;
       return true;
@@ -366,7 +372,7 @@
     if (action === "fetch-models") {
       var urlInput = document.querySelector('[data-action="setting-url"]');
       var keyInput = document.querySelector('[data-action="setting-key"]');
-      var modelInput = document.querySelector('[data-action="setting-model"]');
+      var modelInput = document.querySelector('[data-action="setting-model-text"]');
       var settings = SG.saveSettings({
         baseUrl: urlInput ? urlInput.value : SG.settings().baseUrl,
         apiKey: keyInput ? keyInput.value : SG.settings().apiKey,
@@ -379,14 +385,25 @@
       }).then(function (data) {
         var names = ((data && data.data) || []).map(function (item) { return item.id; }).filter(Boolean);
         if (!names.length) throw new Error("empty");
-        var picked = window.prompt("拉取到这些模型，把要用的名字粘回去：\n" + names.join("\n"), names[0]);
-        if (!picked) return;
-        SG.saveSettings({ model: picked });
+        SG.saveSettings({ model: names[0], models: names });
         render();
+        toast("已拉取 " + names.length + " 个模型", false);
       }).catch(function () { toast("没能拉取，可以手填模型名", false); });
       return;
     }
-    if (action === "save-settings") { SG.saveSettings({}); toast("接口已保存", false); return; }
+    if (action === "add-profile") { var profile = SG.addProfile(); render(); focusName("profile-name", profile); return; }
+    if (action === "delete-profile") {
+      if (!SG.deleteProfile(id)) { toast("至少留一套接口", false); return; }
+      render();
+      return;
+    }
+    if (action === "copy-platform") { var platformCopy = SG.duplicatePlatform(id); render(); focusName("platform-name", platformCopy); return; }
+    if (action === "delete-platform") {
+      if (!SG.deletePlatform(id)) { toast("内置预设不能删", false); return; }
+      render();
+      return;
+    }
+    if (action === "use-platform") { SG.usePlatform(id); render(); return; }
     if (action === "generate-outline" || action === "generate-short" || action === "generate-episode" || action === "generate-all") {
       runGenerate(action, id);
       return;
@@ -475,6 +492,8 @@
       render();
       return;
     }
+    if (action === "use-profile") { SG.useProfile(el.value); render(); return; }
+    if (action === "setting-model") { SG.saveSettings({ model: el.value }); return; }
     if (action === "export-choice") {
       if (!SG.ui.exportChoices) SG.ui.exportChoices = { html: true, voice: true, roles: true, tags: false };
       SG.ui.exportChoices[el.getAttribute("data-kind")] = el.checked;

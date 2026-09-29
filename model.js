@@ -159,23 +159,35 @@
     delete project.key;
   }
 
-  function freshSettings() {
-    return { baseUrl: "", model: "", apiKey: "" };
-  }
-
-  function normalizeSettings(value) {
-    var source = value && typeof value === "object" ? value : {};
+  function freshProfile(partial) {
+    var source = partial && typeof partial === "object" ? partial : {};
     return {
+      id: source.id || uid(),
+      name: String(source.name || "").slice(0, 32),
       baseUrl: String(source.baseUrl || "").trim().replace(/\/+$/, ""),
       model: String(source.model || "").trim().slice(0, 120),
-      apiKey: String(source.apiKey || "")
+      apiKey: String(source.apiKey || ""),
+      models: Array.isArray(source.models) ? source.models.map(function (item) { return String(item || ""); }).filter(Boolean).slice(0, 300) : []
     };
+  }
+
+  function freshSettings() {
+    var profile = freshProfile();
+    return { profiles: [profile], activeProfileId: profile.id };
   }
 
   function loadSettings() {
     try {
       if (typeof localStorage === "undefined" || !localStorage.getItem) return freshSettings();
-      return normalizeSettings(JSON.parse(localStorage.getItem(SETTINGS_KEY) || "null"));
+      var parsed = JSON.parse(localStorage.getItem(SETTINGS_KEY) || "null") || {};
+      if (!Array.isArray(parsed.profiles)) {
+        var only = freshProfile(parsed);
+        return { profiles: [only], activeProfileId: only.id };
+      }
+      var profiles = parsed.profiles.map(freshProfile);
+      if (!profiles.length) return freshSettings();
+      var active = profiles.some(function (item) { return item.id === parsed.activeProfileId; }) ? parsed.activeProfileId : profiles[0].id;
+      return { profiles: profiles, activeProfileId: active };
     } catch (err) {
       return freshSettings();
     }
@@ -183,16 +195,56 @@
 
   var settings = loadSettings();
 
-  function saveSettings(partial) {
-    settings = normalizeSettings({
-      baseUrl: partial.baseUrl != null ? partial.baseUrl : settings.baseUrl,
-      model: partial.model != null ? partial.model : settings.model,
-      apiKey: partial.apiKey != null ? partial.apiKey : settings.apiKey
-    });
+  function activeProfile() {
+    for (var i = 0; i < settings.profiles.length; i++) {
+      if (settings.profiles[i].id === settings.activeProfileId) return settings.profiles[i];
+    }
+    return settings.profiles[0];
+  }
+
+  function writeSettings() {
     try {
       if (typeof localStorage !== "undefined" && localStorage.setItem) localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings));
     } catch (err) {}
-    return settings;
+    return activeProfile();
+  }
+
+  function saveSettings(partial) {
+    var profile = activeProfile();
+    if (partial.baseUrl != null) profile.baseUrl = String(partial.baseUrl).trim().replace(/\/+$/, "");
+    if (partial.model != null) profile.model = String(partial.model).trim().slice(0, 120);
+    if (partial.apiKey != null) profile.apiKey = String(partial.apiKey);
+    if (partial.models) profile.models = partial.models.slice(0, 300);
+    return writeSettings();
+  }
+
+  function addProfile() {
+    var profile = freshProfile();
+    settings.profiles.push(profile);
+    settings.activeProfileId = profile.id;
+    writeSettings();
+    return profile.id;
+  }
+
+  function useProfile(id) {
+    if (!settings.profiles.some(function (item) { return item.id === id; })) return;
+    settings.activeProfileId = id;
+    writeSettings();
+  }
+
+  function setProfileName(id, name) {
+    var clean = String(name || "").slice(0, 32);
+    if (nameTaken(settings.profiles, clean, id)) throw duplicateNameError();
+    settings.profiles.forEach(function (item) { if (item.id === id) item.name = clean; });
+    writeSettings();
+  }
+
+  function deleteProfile(id) {
+    if (settings.profiles.length <= 1) return false;
+    settings.profiles = settings.profiles.filter(function (item) { return item.id !== id; });
+    if (settings.activeProfileId === id) settings.activeProfileId = settings.profiles[0].id;
+    writeSettings();
+    return true;
   }
 
   function normalizeProject(project) {
@@ -443,6 +495,37 @@
     if (db.activePlatformId === id) db.activePlatformId = db.platforms[0] ? db.platforms[0].id : null;
     persist();
     return true;
+  }
+
+  function duplicatePlatform(id) {
+    var source = null;
+    db.platforms.forEach(function (item) { if (item.id === id) source = item; });
+    if (!source) return "";
+    var copy = { id: uid(), name: "", builtin: false, rows: source.rows.map(function (row) { return { name: row.name, mark: row.mark }; }) };
+    db.platforms.push(copy);
+    db.activePlatformId = copy.id;
+    persist();
+    return copy.id;
+  }
+
+  function setPlatformText(id, text) {
+    for (var i = 0; i < db.platforms.length; i++) {
+      if (db.platforms[i].id === id) {
+        if (db.platforms[i].builtin) return;
+        var rows = parsePlatform(text);
+        if (!rows.length) return;
+        db.platforms[i].rows = rows;
+        persist();
+        return;
+      }
+    }
+  }
+
+  function setPlatformName(id, name) {
+    var target = null;
+    db.platforms.forEach(function (item) { if (item.id === id) target = item; });
+    if (!target || target.builtin) return;
+    if (renameChecked(db.platforms, id, name, function (item, clean) { item.name = clean; })) persist();
   }
 
   function usePlatform(id) {
@@ -1604,7 +1687,14 @@
 
   function applyBackupSettings(obj) {
     if (!obj || !obj.settings) return false;
-    saveSettings(obj.settings);
+    var incoming = obj.settings.profiles ? obj.settings : { profiles: [obj.settings], activeProfileId: "" };
+    settings = {
+      profiles: (incoming.profiles || []).map(freshProfile),
+      activeProfileId: ""
+    };
+    if (!settings.profiles.length) settings = freshSettings();
+    settings.activeProfileId = settings.profiles.some(function (item) { return item.id === incoming.activeProfileId; }) ? incoming.activeProfileId : settings.profiles[0].id;
+    writeSettings();
     return true;
   }
 
@@ -1618,9 +1708,8 @@
       version: 1,
       exportedAt: new Date().toISOString(),
       settings: {
-        baseUrl: settings.baseUrl,
-        model: settings.model,
-        apiKey: settings.apiKey
+        profiles: settings.profiles,
+        activeProfileId: settings.activeProfileId
       },
       project: copy
     };
@@ -1861,6 +1950,9 @@
     parsePlatform: parsePlatform,
     savePlatform: savePlatform,
     deletePlatform: deletePlatform,
+    duplicatePlatform: duplicatePlatform,
+    setPlatformName: setPlatformName,
+    setPlatformText: setPlatformText,
     usePlatform: usePlatform,
     addLine: function () { return insertAfter(""); },
     insertAfter: insertAfter,
@@ -1932,8 +2024,16 @@
     adoptDraft: adoptDraft,
     saveOutline: saveOutline,
     generationContext: generationContext,
-    settings: function () { return { baseUrl: settings.baseUrl, model: settings.model, hasKey: !!settings.apiKey, apiKey: settings.apiKey }; },
+    settings: function () {
+      var profile = activeProfile();
+      return { id: profile.id, name: profile.name, baseUrl: profile.baseUrl, model: profile.model, models: profile.models, hasKey: !!profile.apiKey, apiKey: profile.apiKey };
+    },
+    profiles: function () { return settings.profiles; },
     saveSettings: saveSettings,
+    addProfile: addProfile,
+    useProfile: useProfile,
+    setProfileName: setProfileName,
+    deleteProfile: deleteProfile,
     applyBackupSettings: applyBackupSettings,
     prepareText: prepareText,
     docxXmlToText: docxXmlToText,
