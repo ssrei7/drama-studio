@@ -48,6 +48,7 @@
     else if (action === "platform-text") SG.setPlatformText(id, el.value);
     else if (action === "core-prompt") SG.setCorePrompt(el.value);
     else if (action === "story-prompt") SG.setStoryPrompt(el.value);
+    else if (action === "line-language") SG.setLineLanguage(el.value);
     else if (action === "rename") SG.rename(el.value);
     else return;
     undo = null;
@@ -86,6 +87,7 @@
     var blocks = [];
     if (context.core) blocks.push("核心要求：\n" + context.core);
     if (context.story) blocks.push("这次的情节：\n" + context.story + "\n按这个情节写。");
+    if (context.language) blocks.push("角色台词使用" + context.language + "。角色名保持角色卡原名，不要翻译。");
     blocks.push("文风：\n" + context.style);
     blocks.push("结构：\n" + context.structure);
     if (context.persona) blocks.push("用户人设：\n" + context.persona);
@@ -106,6 +108,44 @@
     return blocks.join("\n\n");
   }
 
+  function translateDraft(text, name) {
+    var language = SG.settings && SG.current() ? SG.current().lineLanguage : "";
+    if (!language) {
+      SG.saveDraft(text, name, "");
+      return Promise.resolve();
+    }
+    var parsed = SG.parseScript(text);
+    var spoken = parsed.lines.filter(function (line) { return line.kind === "dialogue" || line.kind === "monologue"; });
+    if (!parsed.parsed || !spoken.length) {
+      SG.saveDraft(text, name, "");
+      return Promise.resolve();
+    }
+    window.SGPending = "正在翻译";
+    render();
+    var prompt = "把下面每一行台词翻译成中文。严格按原顺序返回，一行原文对应一行译文，不要加编号、角色名或解释。\n\n" + spoken.map(function (line) { return line.text; }).join("\n");
+    return requestModel({ language: "", kind: "translate", prompt: prompt }).then(function (translated) {
+      var rows = String(translated || "").replace(/\r\n?/g, "\n").split("\n").map(function (row) { return row.trim(); }).filter(Boolean);
+      if (rows.length !== spoken.length) throw new Error("翻译行数对不上，原文已保存");
+      var index = 0;
+      var merged = [];
+      parsed.lines.forEach(function (line) {
+        merged.push("【" + line.label + "】");
+        if (line.emotion) merged.push("情绪：" + line.emotion);
+        merged.push(line.text);
+        if (line.kind === "dialogue" || line.kind === "monologue") {
+          merged.push("【旁白】");
+          merged.push(rows[index]);
+          index += 1;
+        }
+        merged.push("");
+      });
+      SG.saveDraft(merged.join("\n"), name, "");
+    }).catch(function (err) {
+      SG.saveDraft(text, name, "");
+      throw err;
+    });
+  }
+
   function requestModel(context) {
     var settings = SG.settings();
     if (!settings.baseUrl || !settings.model || !settings.apiKey) return Promise.reject(new Error("接口还没填完整"));
@@ -114,7 +154,7 @@
       headers: { "Content-Type": "application/json", Authorization: "Bearer " + settings.apiKey },
       body: JSON.stringify({
         model: settings.model,
-        messages: [{ role: "user", content: promptText(context) }]
+        messages: [{ role: "user", content: context.kind === "translate" ? context.prompt : promptText(context) }]
       })
     }).then(function (response) {
       if (!response.ok) throw new Error("接口返回 " + response.status);
@@ -462,10 +502,10 @@
         SG.saveDraft(text, "分集大纲", "");
       });
       else if (action === "generate-short") job = requestModel(SG.generationContext("script")).then(function (text) {
-        SG.saveDraft(text, "短篇生成稿", "");
+        return translateDraft(text, "短篇生成稿");
       });
       else if (action === "generate-episode") job = requestModel(SG.generationContext("script", project.episodes.filter(function (item) { return item.id === id; })[0])).then(function (text) {
-        SG.saveDraft(text, "单集生成稿", "");
+        return translateDraft(text, "单集生成稿");
       });
       else {
         var index = 0;
@@ -476,7 +516,7 @@
             window.SGPending = "正在请求 " + index + " / " + count;
             render();
             return requestModel(SG.generationContext("script", episode)).then(function (text) {
-              SG.saveDraft(text, episode.title || ("第" + index + "集"), "");
+              return translateDraft(text, episode.title || ("第" + index + "集"));
             });
           });
         });

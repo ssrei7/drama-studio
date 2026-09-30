@@ -260,6 +260,7 @@
     if (!Array.isArray(project.castNames)) project.castNames = [];
     project.corePrompt = clipText(project.corePrompt);
     project.storyPrompt = clipText(project.storyPrompt);
+    project.lineLanguage = String(project.lineLanguage || "").trim().slice(0, 32);
     project.mode = project.mode === "serial" ? "serial" : project.mode === "short" ? "short" : "";
     if (!Array.isArray(project.episodes)) project.episodes = [];
     if (!Array.isArray(project.drafts)) project.drafts = [];
@@ -1245,6 +1246,13 @@
     touch();
   }
 
+  function setLineLanguage(text) {
+    var project = current();
+    if (!project) return;
+    project.lineLanguage = String(text || "").trim().slice(0, 32);
+    touch();
+  }
+
   function setEpisodeTitle(id, title) {
     var project = current();
     if (!project) return;
@@ -1530,6 +1538,7 @@
       kind: kind,
       core: project.corePrompt,
       story: project.storyPrompt,
+      language: project.lineLanguage,
       style: style.text,
       structure: structure.text,
       persona: persona ? persona.name + "\n" + persona.body : "",
@@ -2051,6 +2060,7 @@
     workingLines: workingLines,
     setCorePrompt: setCorePrompt,
     setStoryPrompt: setStoryPrompt,
+    setLineLanguage: setLineLanguage,
     setEpisodeTitle: setEpisodeTitle,
     setEpisodeSummary: setEpisodeSummary,
     openEpisode: openEpisode,
