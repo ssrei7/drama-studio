@@ -167,8 +167,16 @@
       baseUrl: String(source.baseUrl || "").trim().replace(/\/+$/, ""),
       model: String(source.model || "").trim().slice(0, 120),
       apiKey: String(source.apiKey || ""),
-      models: Array.isArray(source.models) ? source.models.map(function (item) { return String(item || ""); }).filter(Boolean).slice(0, 300) : []
+      models: Array.isArray(source.models) ? source.models.map(function (item) { return String(item || ""); }).filter(Boolean).slice(0, 300) : [],
+      useTemperature: !!source.useTemperature,
+      temperature: clampTemperature(source.temperature)
     };
+  }
+
+  function clampTemperature(value) {
+    var number = Number(value);
+    if (!isFinite(number)) number = 1;
+    return Math.round(Math.max(0, Math.min(2, number)) * 100) / 100;
   }
 
   function freshSettings() {
@@ -215,6 +223,8 @@
     if (partial.model != null) profile.model = String(partial.model).trim().slice(0, 120);
     if (partial.apiKey != null) profile.apiKey = String(partial.apiKey);
     if (partial.models) profile.models = partial.models.slice(0, 300);
+    if (partial.temperature != null) profile.temperature = clampTemperature(partial.temperature);
+    if (partial.useTemperature != null) profile.useTemperature = !!partial.useTemperature;
     return writeSettings();
   }
 
@@ -607,12 +617,12 @@
     });
   }
 
-  function applyPlatform(text, platform, random) {
+  function applyPlatform(text, platform, random, keepUnknown) {
     var rows = platform && platform.rows ? platform.rows : [];
     var map = {};
     rows.forEach(function (row) { map[row.name] = row.mark; });
     return String(text || "").replace(/[（(]([^()（）\n]{1,32})[）)]/g, function (all, name) {
-      if (!Object.prototype.hasOwnProperty.call(map, name)) return "";
+      if (!Object.prototype.hasOwnProperty.call(map, name)) return keepUnknown ? all : "";
       return randomPause(map[name], random);
     });
   }
@@ -1599,11 +1609,28 @@
     return index >= 0 ? index + 1 : 0;
   }
 
-  function tagged(text, enabled, random) {
-    return enabled ? applyPlatform(text, activePlatform(), random) : text;
+  function stripParens(text) {
+    return String(text || "").replace(/[（(][^()（）\n]{0,80}[）)]/g, "");
   }
 
-  function voiceText(project, ids, omitted, taggedOn, random) {
+  function tagged(text, enabled, random, showParens) {
+    if (enabled) return applyPlatform(text, activePlatform(), random, !!showParens);
+    return showParens ? text : stripParens(text);
+  }
+
+  function takeTitle(text) {
+    var lines = String(text || "").replace(/\r\n?/g, "\n").split("\n");
+    var index = 0;
+    while (index < lines.length && !lines[index].trim()) index += 1;
+    var title = "";
+    if (index < lines.length && /^标题[:：]/.test(lines[index].trim())) {
+      title = lines[index].trim().replace(/^标题[:：]\s*/, "").slice(0, 40);
+      lines.splice(index, 1);
+    }
+    return { title: title, text: lines.join("\n").trim() };
+  }
+
+  function voiceText(project, ids, omitted, taggedOn, random, showParens) {
     var blocks = [];
     selectedEpisodes(project, ids).forEach(function (episode) {
       var report = analyze({
@@ -1613,7 +1640,7 @@
       }, episode.id ? null : omitted);
       if (!report.text) return;
       var no = episodeNo(project, episode);
-      blocks.push((no ? "第" + no + "集 " + episode.title + "\n" : "") + tagged(report.text, taggedOn, random));
+      blocks.push((no ? "第" + no + "集 " + episode.title + "\n" : "") + tagged(report.text, taggedOn, random, showParens));
     });
     return blocks.join("\n\n");
   }
@@ -1634,7 +1661,7 @@
     return "<!doctype html><meta charset=\"utf-8\"><title>" + esc(project.name) + "</title><body style=\"font:16px/1.7 sans-serif;max-width:720px;margin:32px auto;padding:0 16px\">" + sections + "</body>";
   }
 
-  function roleTexts(project, ids, taggedOn, random) {
+  function roleTexts(project, ids, taggedOn, random, showParens) {
     var files = [];
     project.characters.forEach(function (character) {
       var blocks = [];
@@ -1644,10 +1671,10 @@
         }).map(function (line) { return String(line.text || "").trim(); });
         if (!rows.length) return;
         var no = episodeNo(project, episode);
-        blocks.push((no ? "第" + no + "集 " + episode.title + "\n" : "") + tagged(rows.join("\n"), taggedOn, random));
+        blocks.push((no ? "第" + no + "集 " + episode.title + "\n" : "") + tagged(rows.join("\n"), taggedOn, random, showParens));
       });
       if (!blocks.length) return;
-      files.push({ name: safeName(character.name || "未命名角色") + ".txt", text: blocks.join("\n\n") });
+      files.push({ name: safeName((project.name || "未命名") + "-" + (character.name || "未命名角色")) + ".txt", text: blocks.join("\n\n") });
     });
     return files;
   }
@@ -1873,6 +1900,11 @@
     var platformId = savePlatform("测试平台", platformTemplate(), "");
     var marked = applyPlatform("妈妈，（轻笑）我饿了。（她看了看碗）", activePlatform(), function () { return 0; });
     check(marked === "妈妈，(chuckle)我饿了。", "platform mark: " + marked);
+    var kept = applyPlatform("妈妈，（轻笑）我饿了。（她看了看碗）", activePlatform(), function () { return 0; }, true);
+    check(kept === "妈妈，(chuckle)我饿了。（她看了看碗）", "keep paren: " + kept);
+    check(tagged("妈妈，（她看了看碗）来。", false) === "妈妈，来。", "strip paren");
+    var titled = takeTitle("标题：末班之后\n【林夏】\n来。");
+    check(titled.title === "末班之后" && titled.text.indexOf("标题") === -1, "draft title");
     var pause = applyPlatform("(停一下)", activePlatform(), function () { return 1; });
     check(pause === "<#0.60#>", "pause range: " + pause);
     var taggedVoice = voiceText({ characters: chars, lines: [newLine({ type: "dialogue", speakerId: lin, text: "(轻笑)来。" })], includeMonologue: true, episodes: [] }, [], {}, true);
@@ -2072,6 +2104,7 @@
     setDraftText: setDraftText,
     deleteDraftLine: deleteDraftLine,
     deleteDraft: deleteDraft,
+    takeTitle: takeTitle,
     parseScript: parseScript,
     parseOutline: parseOutline,
     saveDraft: saveDraft,
@@ -2080,7 +2113,7 @@
     generationContext: generationContext,
     settings: function () {
       var profile = activeProfile();
-      return { id: profile.id, name: profile.name, baseUrl: profile.baseUrl, model: profile.model, models: profile.models, hasKey: !!profile.apiKey, apiKey: profile.apiKey };
+      return { id: profile.id, name: profile.name, baseUrl: profile.baseUrl, model: profile.model, models: profile.models, hasKey: !!profile.apiKey, apiKey: profile.apiKey, useTemperature: !!profile.useTemperature, temperature: clampTemperature(profile.temperature) };
     },
     profiles: function () { return settings.profiles; },
     saveSettings: saveSettings,

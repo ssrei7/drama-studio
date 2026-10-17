@@ -49,6 +49,7 @@
     else if (action === "core-prompt") SG.setCorePrompt(el.value);
     else if (action === "story-prompt") SG.setStoryPrompt(el.value);
     else if (action === "line-language") SG.setLineLanguage(el.value);
+    else if (action === "setting-temperature") SG.saveSettings({ temperature: el.value });
     else if (action === "rename") SG.rename(el.value);
     else return;
     undo = null;
@@ -100,12 +101,23 @@
       if (context.previous) blocks.push("上一集结尾：\n" + context.previous);
       if (context.next) blocks.push("下一集开头：\n" + context.next);
       if (context.locked) blocks.push("这些行已锁定，不要改写：\n" + context.locked);
-      blocks.push("按这个格式回稿：\n【林夏】\n你还没走。\n情绪：放轻\n我以为末班车会在路口等。\n\n【旁白】\n夜班公交已经停了。");
+      blocks.push("正文前先单独写一行标题，例如：标题：末班之后。标题用中文。");
+      blocks.push("按这个格式回稿：\n标题：末班之后\n【林夏】\n你还没走。\n情绪：放轻\n我以为末班车会在路口等。\n\n【旁白】\n夜班公交已经停了。");
       var platform = SG.activePlatform();
       var marks = platform && platform.rows ? platform.rows.map(function (row) { return row.name; }).filter(Boolean) : [];
       if (marks.length) blocks.push("视上下文语境，在台词中用普通括号加入语气、声音或停顿。括号里只能有指定标记名，不能有其他文字，例如：妈妈，(轻笑)我饿了。可用标记名：" + marks.join("、") + "。不要每句都加，不适合语境就不要加。描写、解释和平台符号都不要写进括号。");
     }
     return blocks.join("\n\n");
+  }
+
+  function episodeTitle(project, id) {
+    var found = (project.episodes || []).filter(function (item) { return item.id === id; })[0];
+    return found ? found.title : "";
+  }
+
+  function finishDraft(text, fallback, keepFallback) {
+    var picked = SG.takeTitle(text);
+    return translateDraft(picked.text, keepFallback ? fallback : (picked.title || fallback));
   }
 
   function translateDraft(text, name) {
@@ -149,16 +161,25 @@
   function requestModel(context) {
     var settings = SG.settings();
     if (!settings.baseUrl || !settings.model || !settings.apiKey) return Promise.reject(new Error("接口还没填完整"));
+    var payload = {
+      model: settings.model,
+      messages: [{ role: "user", content: context.kind === "translate" ? context.prompt : promptText(context) }]
+    };
+    if (settings.useTemperature) payload.temperature = settings.temperature;
     return fetch(settings.baseUrl + "/chat/completions", {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: "Bearer " + settings.apiKey },
-      body: JSON.stringify({
-        model: settings.model,
-        messages: [{ role: "user", content: context.kind === "translate" ? context.prompt : promptText(context) }]
-      })
+      body: JSON.stringify(payload)
     }).then(function (response) {
-      if (!response.ok) throw new Error("接口返回 " + response.status);
-      return response.json();
+      return response.text().then(function (body) {
+        var data = {};
+        try { data = JSON.parse(body); } catch (err) {}
+        if (!response.ok) {
+          var detail = data && data.error ? (data.error.message || JSON.stringify(data.error)) : body;
+          throw new Error("接口返回 " + response.status + (detail ? "：" + String(detail).replace(/\s+/g, " ").slice(0, 240) : ""));
+        }
+        return data;
+      });
     }).then(function (data) {
       var text = data && data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content;
       if (!text) throw new Error("接口没有返回正文");
@@ -211,9 +232,9 @@
     var base = SG.safeName(project.name);
     var files = [];
     if (choices.html) files.push({ name: base + "-完整本.html", text: SG.fullHtml(project, ids) });
-    if (choices.voice) files.push({ name: base + "-人声.txt", text: SG.voiceText(project, ids, SG.ui.voiceOmit || {}, !!choices.tags) });
+    if (choices.voice) files.push({ name: base + "-人声.txt", text: SG.voiceText(project, ids, SG.ui.voiceOmit || {}, !!choices.tags, null, !!choices.parens) });
     if (choices.roles) {
-      var roles = SG.roleTexts(project, ids, !!choices.tags);
+      var roles = SG.roleTexts(project, ids, !!choices.tags, null, !!choices.parens);
       if (!roles.length) toast("勾选的音轨里没有角色台词", false);
       else roles.forEach(function (file) { files.push(file); });
     }
@@ -502,10 +523,11 @@
         SG.saveDraft(text, "分集大纲", "");
       });
       else if (action === "generate-short") job = requestModel(SG.generationContext("script")).then(function (text) {
-        return translateDraft(text, "短篇生成稿");
+        return finishDraft(text, "短篇生成稿");
       });
       else if (action === "generate-episode") job = requestModel(SG.generationContext("script", project.episodes.filter(function (item) { return item.id === id; })[0])).then(function (text) {
-        return translateDraft(text, "单集生成稿");
+        var episodeName = episodeTitle(project, id);
+        return finishDraft(text, episodeName || "单集生成稿", !!episodeName);
       });
       else {
         var index = 0;
@@ -516,7 +538,7 @@
             window.SGPending = "正在请求 " + index + " / " + count;
             render();
             return requestModel(SG.generationContext("script", episode)).then(function (text) {
-              return translateDraft(text, episode.title || ("第" + index + "集"));
+              return finishDraft(text, episode.title || ("第" + index + "集"), !!episode.title);
             });
           });
         });
@@ -555,8 +577,9 @@
     }
     if (action === "use-profile") { SG.useProfile(el.value); render(); return; }
     if (action === "setting-model") { SG.saveSettings({ model: el.value }); return; }
+    if (action === "use-temperature") { SG.saveSettings({ useTemperature: el.checked }); return; }
     if (action === "export-choice") {
-      if (!SG.ui.exportChoices) SG.ui.exportChoices = { html: true, voice: true, roles: true, tags: false };
+      if (!SG.ui.exportChoices) SG.ui.exportChoices = { html: true, voice: true, roles: true, tags: false, parens: false };
       SG.ui.exportChoices[el.getAttribute("data-kind")] = el.checked;
       render();
       return;

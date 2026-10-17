@@ -96,7 +96,7 @@
   }
 
   function exportBox(project) {
-    var choices = SG.ui.exportChoices || { html: true, voice: true, roles: true, tags: false };
+    var choices = SG.ui.exportChoices || { html: true, voice: true, roles: true, tags: false, parens: false };
     var platform = SG.activePlatform();
     var tracks = project.mode === "serial" ? project.episodes.map(function (episode, index) {
       var selected = !SG.ui.exportEpisodes || SG.ui.exportEpisodes[episode.id] !== false;
@@ -109,6 +109,7 @@
         '<label class="check"><input type="checkbox" data-action="export-choice" data-kind="voice"' + (choices.voice ? " checked" : "") + "><span>纯人声 TXT</span></label>" +
         '<label class="check"><input type="checkbox" data-action="export-choice" data-kind="roles"' + (choices.roles ? " checked" : "") + "><span>按角色拆开 ZIP</span></label>" +
         '<label class="check"><input type="checkbox" data-action="export-choice" data-kind="tags"' + (choices.tags ? " checked" : "") + "><span>平台标签</span></label>" +
+        '<label class="check"><input type="checkbox" data-action="export-choice" data-kind="parens"' + (choices.parens ? " checked" : "") + "><span>显示括号</span></label>" +
         '<button type="button" class="icon" data-action="platform-help" aria-label="平台标签教程">?</button>' +
       "</div>" +
       '<p class="help" id="platform-help" hidden>台词里用普通括号写标记名，例如：妈妈，(轻笑)我饿了。换平台时，复制模板，把右边换成那个平台的标记，保存成 txt 再导入。可以另存一套，或替换当前这套。停顿写 <#0.2-0.6#> 时，每次导出随机取一个数。预设里没有的括号会原样保留。内置 MiniMax 不能删除。平台标签只在导出配音稿时替换，生成时不会发给文本模型。</p>' +
@@ -277,6 +278,8 @@
         '<label class="text-label">模型<select data-action="setting-model"><option value="">' + (settings.models && settings.models.length ? "选择模型" : "先拉取模型") + '</option>' + models + '</select></label>' +
         '<input data-action="setting-model-text" value="' + SG.esc(settings.model) + '" placeholder="也可以手填模型名">' +
         '<label class="text-label">密钥<input data-action="setting-key" type="password" value="' + SG.esc(settings.apiKey) + '" placeholder="' + (settings.hasKey ? "已保存" : "只留在这台设备，也会写入备份") + '"></label>' +
+        '<label class="check"><input type="checkbox" data-action="use-temperature"' + (settings.useTemperature ? " checked" : "") + '><span>使用温度</span></label>' +
+        '<label class="text-label">温度<input data-action="setting-temperature" type="number" min="0" max="2" step="0.1" value="' + SG.esc(settings.temperature) + '"></label>' +
         '<div class="line-tools"><button type="button" data-action="fetch-models">拉取模型</button><button type="button" data-action="add-profile">另存一套接口</button></div>' +
         '<label class="text-label">核心提示词<textarea data-action="core-prompt" rows="3" placeholder="可空。有内容就放在发给模型的最前面。">' + SG.esc(project.corePrompt || "") + "</textarea></label>" +
         '<label class="text-label">普通提示词<textarea data-action="story-prompt" rows="4" placeholder="可空。写这次想要的情节，留空就自由发挥。">' + SG.esc(project.storyPrompt || "") + "</textarea></label>" +
